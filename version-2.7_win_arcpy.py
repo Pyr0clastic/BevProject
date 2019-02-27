@@ -1,22 +1,23 @@
+# -*- coding: utf-8 -*-
+# import sys
 # import arcpy
 import numpy as np
 import pandas as pd
-import xlsxwriter
-import xlrd
+# import xlsxwriter
+# import xlrd
 import os
 import re
+
 encoding = "utf-8"
 
 # Displays all Rows in a DataFrame; default is limited to around hundred
 pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
+# pd.set_option('display.max_columns', None)
 
 cwd = os.getcwd()
 print(cwd)
 
-# Assign spreadsheet filename to `file`
-# ====> place comment or delete line
-x = '/DATEN201617_VGL.xlsx'
+x = '/DATEN201617_VGL.xlsx'     # TODO delete lines 20 until 30
 y = '/DATEN201516_VGL.xlsx'
 
 inp = input("Which Dataset?: ")
@@ -27,54 +28,59 @@ elif inp == "2":
 else:
     file = y
 
-# filePath = arcpy.GetParameterAsText(0).replace('\\', '\u005C')
-# # ====> uncomment
+# TODO uncomment filePath = arcpy.GetParameterAsText(0).replace('\\','\u005C')
 filePath = os.getcwd()
-# arcpy.AddMessage ("Imported from : " + filePath)
-# # ====> uncomment
+# TODO: uncomment arcpy.AddMessage ("Imported from : " + filePath)
 fileFolder, fileName = os.path.split(filePath)
 print(filePath)
 print(fileFolder, fileName)
 os.chdir(fileFolder)
-# ====> remove line
-xl = pd.ExcelFile(filePath + file)
+xl = pd.ExcelFile(filePath + file)  # TODO: remove line
 # Load spreadsheet
-# xl = pd.ExcelFile(file)
-# # ====> uncomment
+# TODO: xl = pd.ExcelFile(file)
 
 # Print the sheet names
 print(xl.sheet_names)
 
 
-def sheet_bevstand(excelFile):
+def find_sheet(excelFile):
     """
-    This function searches for the Sheet "Bevoelkerungsstand" in the provided ExcelFile
-    Additionally it checks the survey year
-
+    This function searches for the exact sheetnames containing
+    "Bevoelkerungsstand" and "Bevoelkerungsentwicklung" in the ExcelFile
+    It also checks the survey year of sheet Bevoelkerungsstand
     Parameters:
     -----------
     excelFile : the loaded excel spreasdsheet
     """
     wsheetName_namen = xl.sheet_names
+    cache = []
     for wsheetName in wsheetName_namen:
         if "stand" in wsheetName:
+            cache.append(wsheetName)
             surveyYear = re.findall(r'\d+', wsheetName)
             for number in surveyYear:
                 if len(number) == 4:
-                    return wsheetName, number
+                    cache.append(number)
+                    # yield wsheetName, number
+                    # return wsheetName, number
+        elif "entwicklung" in wsheetName:
+            cache.append(wsheetName)
         else:
             continue
+    return cache
 
 
 def subset_dpr(xl, wsheetName, year):
     """
-    Function erwerbData's purpose is to select just the data needed for the calculation of the parameter dependency ratio (Abhaengigenquote)
+    Function erwerbData's purpose is to select just the data needed for the
+    calculation of the parameter dependency ratio (Abhaengigenquote)
 
     Parameters:
     -----------
-    wsheetName:  The exact name of the needed excel worksheet that contains Bevoelkerungsstand
-    year:   Survey year
-    xl:     loaded excel spreadsheet
+    wsheetName:     The exact name of the needed excel worksheet that
+                    contains Bevoelkerungsstand
+    year:           Survey year
+    xl:             loaded excel spreadsheet
     """
     df_raw = xl.parse(wsheetName)
     all = [
@@ -87,19 +93,22 @@ def subset_dpr(xl, wsheetName, year):
     ##########################
     new = []
     dict = {}
+
     if year != "2016":
         for i in all:
             new.append(i.replace("2016", year))
-            #all.append(i.replace("2016", year))
+            # all.append(i.replace("2016", year))
             q = i.replace("2016", year)
             dict[i] = q
         all.clear()
         all = new
+        df_raw.rename(columns=dict, inplace=True)
     ########################
+
+    # BUG If not this but another function is executed other function needs
+    # this columns too for a shp join. Possible Solution => Put whole code in
+    # class that has these columns as class attributes
     df_erw = df_raw[["Kennz", "Name", all[0]]]
-    df_raw.rename(columns=dict, inplace=True)
-    jugend = set(all[1:4])
-    pensionisten = set(all[14:19])
     erwerbslos = set(all[1:4] + all[14:19])
     erwerbsf = set(all[4:14])
     # slices based on column index; creates new slick DataFrame with values
@@ -119,22 +128,34 @@ def dpr_calc(erwerbsfaehig, nicht_erwerbsfaehig):
     dpr_calc function calculats dependency ratio (Abhaengigenquote)
     Parameters:
     -----------
-    erwerbsfaehig:              Column in Dataframe containing population Erwerbsfaehige
-    nicht_erwerbsfaehig:        Column in Dataframe containing population nicht Erwerbsfaehige
+    erwerbsfaehig:              Column in Dataframe containing Erwerbsfaehige
+    nicht_erwerbsfaehig:        Column in Dataframe containing nicht Erwerbsfaehige
     """
     x = (nicht_erwerbsfaehig / erwerbsfaehig) * 100
     return round(x, 2)
 
 
-def subset_aagc(xl, wsheetName, sh):
+def subset_aagr(xl, bevEntwSheet):
     """
     this function selects and aggregates Data for the calculation of the
-    average annual growth rate (aagc/durchschnittliche jährliche Bevölkerungsveränderung)
+    average annual growth rate (durchschn. jaehrl. Bevoelkerungsveraenderung)
     Parameters:
     -----------
-
+    xl: loaded excel spreadsheet
+    bevEntwSheet:   excel sheet with Bevoelkerungsentwicklung information
+    startYear:      startYear    # TODO Input has to be selectable over toolbox
+    endYear:                # TODO Has to be selectable over toolbox
     """
-    pass
+    startYear = int(input("Ausgangszeitpunkt: "))
+    endYear = int(input("Endzeitpunkt: "))
+    timeDiff = endYear - startYear
+    print(
+        "Ausgangszeitpunkt: {} \nEndzeitpunkt: {} \nZeitdifferenz: {}".format(
+            startYear,
+            endYear,
+            timeDiff))
+
+    df_bevEntw = xl.parse(bevEntwSheet)
 
 
 print("______________________________________________________________")
@@ -153,37 +174,49 @@ print("|                                                            |")
 print("|                                                            |")
 print("--------------------------------------------------------------")
 print(
-    "________________________________________________________________________________________________________"
+    "_________________________________________________________________________"
 )
-wsheetName, number = sheet_bevstand(xl)
+# wsheetName, number = sheet_bevstand(xl)
+sheetInfo = find_sheet(xl)
+bevEntwSheet, wsheetName, number = sheetInfo
+# number = sheetInfo[2]
+
+print(bevEntwSheet)
+print(wsheetName)
+print(number)
+
 df_dpr, df_raw = subset_dpr(xl, wsheetName, number)
 # usage of vectorize function for performance improvement when handling
 # big datasets
 command = np.vectorize(dpr_calc)
-df_dpr['dependency_ratio'] = command(df_dpr.erwerbsfaehig,
-                                     df_dpr.nicht_erwerbsfaehig)
-# print(df_dpr)
-# arcpy.AddMessage(df_dpr)
-# # ====> uncomment
-print(df_dpr.info())
+df_dpr['dependency_ratio'] = command(
+    df_dpr.erwerbsfaehig,
+    df_dpr.nicht_erwerbsfaehig)
 
-df_dpr.to_csv("~/test_csv.csv", sep=';', encoding='utf-8')
+# TODO unckommen arcpy.AddMessage(df_dpr)
+# # ====> uncomment
+# print(df_dpr.info())
+
+df_dpr.to_csv(
+    "~/test_csv.csv", sep=';',
+    encoding='utf-8')  # TODO: adjust so file is exported to gdb folder
 
 v = df_dpr.to_numpy()
-print(v)
 
-#################### create numpy array from pandas dataframe ############
+# create numpy array from pandas dataframe
 # important to be able to save the data as table in a gdb
 
 # creates numpy array from pandas DataFrame (df_dpr)
 x = np.array(np.rec.fromrecords(df_dpr.values))
 names = df_dpr.dtypes.index.tolist()
-print(x.dtype)
+# print(x.dtype)
 
 # saves column names in a tuple
 x.dtype.names = tuple(names)
-print(x.dtype)
-#arcpy.da.NumPyArrayToTable(x, r'C:\Temp\BevProject\BevProject.gdb\testTable')                                      # ====> uncomment
+
+# print(x.dtype)
+# TODO: uncomment! arcpy.da.NumPyArrayToTable(x, r'C:\Temp\BevProject\BevProject.gdb\testTable')
 #########################################
 print(df_dpr.head())
-print(df_raw.head())
+# print(df_raw.head()
+subset_aagr(xl, bevEntwSheet)
