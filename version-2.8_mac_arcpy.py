@@ -147,14 +147,45 @@ def subset_aagr(xl, bevEntwSheet):
     endYear:                      # TODO Has to be selectable over toolbox
     """
 
-    startYear = int(input("Ausgangszeitpunkt: "))
-    endYear = int(input("Endzeitpunkt: "))
-    timeDiff = endYear - startYear
+    startYear = input("Ausgangszeitpunkt: ")
+    endYear = input("Endzeitpunkt: ")
+    timeDiff = int(endYear) - int(startYear)
     print("Ausgangszeitpunkt: {} \nEndzeitpunkt: {} \nZeitdifferenz: {}".format(
         startYear, endYear, timeDiff))
 
     df_bevEntw = xl.parse(bevEntwSheet)
-    df_aagr = df_bevEntw[["Kennz", "Name", all[0]]]
+    startY = "Wbv" + startYear
+    endY = "Wbv" + endYear
+    df_aagr = df_bevEntw[["Kennz", "Name", startY, endY]]
+
+    print(df_aagr)
+
+    return df_aagr, timeDiff
+
+
+def aagr_calc(startColumn, endColumn, timeDelta):
+    """Calculates average annual growth rate.
+
+    Args:
+        startColumn (DataFrame column): population at interval start.
+        endColumn (DataFrame column): population at interval end.
+        timeDelta (int): end year - start year.
+
+    Returns:
+        DataFrame column: Returns average annual growth rate.
+
+    """
+
+    result = ((endColumn / startColumn)**(1 / timeDelta) - 1) * 100
+    return result
+
+
+def exportCSV(DataFrame1, DataFrame2=None):
+    if DataFrame2 is not None:
+        df_joined = pd.merge(DataFrame1, DataFrame2, on=['Kennz', 'Name'])
+        df_joined.to_csv("~/test_csv.csv", sep=';', encoding='utf-8')
+    else:
+        DataFrame1.to_csv("~/test_csv.csv", sep=';', encoding='utf-8')
 
 
 print("______________________________________________________________")
@@ -194,10 +225,6 @@ df_dpr['dependency_ratio'] = command(df_dpr.erwerbsfaehig,
 # # ====> uncomment
 # print(df_dpr.info())
 
-df_dpr.to_csv(
-    "~/test_csv.csv", sep=';',
-    encoding='utf-8')  # TODO: adjust so file is exported to gdb folder
-
 v = df_dpr.to_numpy()
 
 # create numpy array from pandas dataframe
@@ -213,7 +240,26 @@ x.dtype.names = tuple(names)
 
 # print(x.dtype)
 # TODO: uncomment! arcpy.da.NumPyArrayToTable(x, r'C:\Temp\BevProject\BevProject.gdb\testTable')
+
 #########################################
 print(df_dpr.head())
 # print(df_raw.head()
-subset_aagr(xl, bevEntwSheet)
+
+# aagr calculation
+df_bevEntw, timeDiff = subset_aagr(xl, bevEntwSheet)
+aagr_calc_vect = np.vectorize(aagr_calc)
+df_bevEntw['average_annual_growth_rate'] = aagr_calc_vect(
+    df_bevEntw.iloc[:, 2], df_bevEntw.iloc[:, 3], timeDiff)
+print(df_bevEntw)
+print(type(df_bevEntw.iloc[:, 2]))
+
+###########################################################################
+# NOTE Export Data as table and csv
+# BUG if dpr and aagr calculated both DataFrames contain columns Kennz and name
+# Solution: performe join
+
+# df_dpr.to_csv(
+#     "~/test_csv.csv", sep=';',
+#     encoding='utf-8')  # TODO: adjust so file is exported to gdb folder
+
+exportCSV(df_bevEntw, df_dpr)
