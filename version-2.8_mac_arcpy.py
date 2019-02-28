@@ -180,7 +180,18 @@ def aagr_calc(startColumn, endColumn, timeDelta):
     return result
 
 
-def exportCSV(DataFrame1, DataFrame2=None):
+def exportCSV(
+        DataFrame1, DataFrame2=None
+):  # FIXME Possibly more data should be exported (Michael's function)
+    """Exports calculated data as csv file.
+    Args:
+        DataFrame1 (DataFrame): pandas DataFrame to export.
+        DataFrame2 (DataFrame): pandas DataFrame to export.
+
+    Returns:
+        .csv: Returns calculated DataFrame(s) as csv file.
+
+    """
     if DataFrame2 is not None:
         df_joined = pd.merge(DataFrame1, DataFrame2, on=['Kennz', 'Name'])
         df_joined.to_csv("~/test_csv.csv", sep=';', encoding='utf-8')
@@ -221,45 +232,59 @@ command = np.vectorize(dpr_calc)
 df_dpr['dependency_ratio'] = command(df_dpr.erwerbsfaehig,
                                      df_dpr.nicht_erwerbsfaehig)
 
-# TODO unckommen arcpy.AddMessage(df_dpr)
+# TODO uncomment arcpy.AddMessage(df_dpr)
 # # ====> uncomment
 # print(df_dpr.info())
-
-v = df_dpr.to_numpy()
-
-# create numpy array from pandas dataframe
-# important to be able to save the data as table in a gdb
-
-# creates numpy array from pandas DataFrame (df_dpr)
-x = np.array(np.rec.fromrecords(df_dpr.values))
-names = df_dpr.dtypes.index.tolist()
-# print(x.dtype)
-
-# saves column names in a tuple
-x.dtype.names = tuple(names)
-
-# print(x.dtype)
-# TODO: uncomment! arcpy.da.NumPyArrayToTable(x, r'C:\Temp\BevProject\BevProject.gdb\testTable')
 
 #########################################
 print(df_dpr.head())
 # print(df_raw.head()
 
 # aagr calculation
-df_bevEntw, timeDiff = subset_aagr(xl, bevEntwSheet)
+df_aagr, timeDiff = subset_aagr(xl, bevEntwSheet)
 aagr_calc_vect = np.vectorize(aagr_calc)
-df_bevEntw['average_annual_growth_rate'] = aagr_calc_vect(
-    df_bevEntw.iloc[:, 2], df_bevEntw.iloc[:, 3], timeDiff)
-print(df_bevEntw)
-print(type(df_bevEntw.iloc[:, 2]))
+df_aagr['average_annual_growth_rate'] = aagr_calc_vect(
+    df_aagr.iloc[:, 2], df_aagr.iloc[:, 3], timeDiff)
+print(df_aagr)
+print(type(df_aagr.iloc[:, 2]))
 
 ###########################################################################
 # NOTE Export Data as table and csv
-# BUG if dpr and aagr calculated both DataFrames contain columns Kennz and name
+# BUG if dpr and aagr are both calculated: both DataFrames contain
+# columns Kennz and Name.
 # Solution: performe join
 
 # df_dpr.to_csv(
 #     "~/test_csv.csv", sep=';',
 #     encoding='utf-8')  # TODO: adjust so file is exported to gdb folder
 
-exportCSV(df_bevEntw, df_dpr)
+exportCSV(df_aagr, df_dpr)
+
+###########################################################################
+# NOTE data preparation for table creation & further addition to .gdb
+# data Join .shp with table
+v = df_dpr.to_numpy()
+
+# create numpy array from pandas dataframe
+# important to be able to save the data as table in a gdb
+
+# creates numpy array from pandas DataFrame (df_dpr)
+dpr_array = np.array(np.rec.fromrecords(df_dpr.values))
+dpr_names = df_dpr.dtypes.index.tolist()
+# print(x.dtype)
+
+# saves column names in a tuple
+dpr_array.dtype.names = tuple(dpr_names)
+
+print(dpr_array.dtype)
+print(dpr_array)
+print(type(dpr_array))
+# TODO uncomment arcpy.da.NumPyArrayToTable(dpr_array, r'C:\Temp\BevProject\BevProject.gdb\testTable')
+
+aagr_array = np.array(np.rec.fromrecords(df_aagr.values))
+aagr_names = df_aagr.dtypes.index.tolist()
+
+aagr_array.dtype.names = tuple(aagr_names)
+
+print(aagr_array)
+# This is some random stuff just so no error shows up ...
